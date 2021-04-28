@@ -9,6 +9,9 @@
 Maccy is a lightweight clipboard manager for macOS. It keeps the history of what you copy
 and lets you quickly navigate, search, and use previous clipboard contents.
 
+This fork has only one difference from original Maccy, its copy+paste from clipboard just with pressing Enter while in clipboard menu (<kbd>SHIFT (⇧)</kbd> + <kbd>COMMAND (⌘)</kbd> + <kbd>C</kbd>)
+
+
 Maccy works on macOS Mojave 10.14 or higher.
 
 <!-- vim-markdown-toc GFM -->
