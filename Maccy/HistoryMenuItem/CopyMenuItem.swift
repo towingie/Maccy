@@ -12,6 +12,7 @@ extension HistoryMenuItem {
 
     override func select() {
       clipboard.copy(item)
+      clipboard.paste()
     }
 
     override func alternate() {
