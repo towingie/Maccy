@@ -28,7 +28,7 @@ class HistoryMenuItem: NSMenuItem {
     if isImage(item) {
       loadImage(item)
     } else if isFile(item) {
-      loadString(item, from: .fileURL)
+      loadFile(item)
     } else {
       loadString(item, from: .string)
     }
@@ -107,6 +107,25 @@ class HistoryMenuItem: NSMenuItem {
     }
   }
 
+  private func loadFile(_ item: HistoryItem) {
+    if let fileURLData = contentData(item, [.fileURL]) {
+      if let fileURL = URL(dataRepresentation: fileURLData, relativeTo: nil, isAbsolute: true) {
+        if let string = fileURL.absoluteString.removingPercentEncoding {
+          self.value = string
+          self.title = trimmedString(string
+                                      .trimmingCharacters(in: .whitespacesAndNewlines)
+                                      .replacingOccurrences(of: "\n", with: ""),
+                                    showMaxLength)
+          self.image = ColorImage.from(title)
+          self.toolTip = """
+          \(trimmedString(string, tooltipMaxLength))
+          \n \n\n
+          \(defaultTooltip(item))
+          """
+        }
+      }
+    }
+  }
   private func loadString(_ item: HistoryItem, from: NSPasteboard.PasteboardType) {
     if let contentData = contentData(item, [from]) {
       if let string = String(data: contentData, encoding: .utf8) {
