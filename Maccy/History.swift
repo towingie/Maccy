@@ -1,13 +1,14 @@
 import AppKit
 
 class History {
-  public var all: [HistoryItem] {
-    var unpinned = HistoryItem.unpinned()
+  var all: [HistoryItem] {
+    let sorter = Sorter(by: UserDefaults.standard.sortBy)
+    var unpinned = sorter.sort(HistoryItem.unpinned())
     while unpinned.count > UserDefaults.standard.size {
       remove(unpinned.removeLast())
     }
 
-    return HistoryItem.all()
+    return sorter.sort(HistoryItem.all())
   }
 
   init() {
@@ -23,6 +24,8 @@ class History {
       item.firstCopiedAt = existingHistoryItem.firstCopiedAt
       item.numberOfCopies += existingHistoryItem.numberOfCopies
       item.pin = existingHistoryItem.pin
+      item.title = existingHistoryItem.title
+      item.application = existingHistoryItem.application
       remove(existingHistoryItem)
     } else {
       if UserDefaults.standard.playSounds {
@@ -43,6 +46,10 @@ class History {
     CoreDataManager.shared.saveContext()
   }
 
+  func clearUnpinned() {
+    all.filter({ $0.pin == nil }).forEach(remove(_:))
+  }
+
   func clear() {
     all.forEach(remove(_:))
   }
@@ -50,7 +57,7 @@ class History {
   private func findSimilarItem(_ item: HistoryItem) -> HistoryItem? {
     let duplicates = all.filter({ $0 == item || $0.supersedes(item) })
     if duplicates.count > 1 {
-      return duplicates.last
+      return duplicates.first(where: { $0.objectID != item.objectID })
     } else {
       return nil
     }

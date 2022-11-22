@@ -4,7 +4,7 @@ import Preferences
 class AppearancePreferenceViewController: NSViewController, PreferencePane {
   public let preferencePaneIdentifier = Preferences.PaneIdentifier.appearance
   public let preferencePaneTitle = NSLocalizedString("preferences_appearance", comment: "")
-  public let toolbarItemIcon = NSImage(named: NSImage.colorPanelName)!
+  public let toolbarItemIcon = NSImage(named: .paintpalette)!
 
   override var nibName: NSNib.Name? { "AppearancePreferenceViewController" }
 
@@ -36,6 +36,9 @@ class AppearancePreferenceViewController: NSViewController, PreferencePane {
 
   @IBAction func popupPositionChanged(_ sender: NSPopUpButton) {
     switch sender.selectedTag() {
+    case 3:
+      UserDefaults.standard.popupPosition = "window"
+      showMenuIconButton.isEnabled = true
     case 2:
       UserDefaults.standard.popupPosition = "statusItem"
       showMenuIconButton.isEnabled = false
@@ -94,6 +97,8 @@ class AppearancePreferenceViewController: NSViewController, PreferencePane {
 
   private func populatePopupPosition() {
     switch UserDefaults.standard.popupPosition {
+    case "window":
+      popupAtButton.selectItem(withTag: 3)
     case "statusItem":
       popupAtButton.selectItem(withTag: 2)
       showMenuIconButton.isEnabled = false

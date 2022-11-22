@@ -1,0 +1,39 @@
+
+/* Class = "NSButtonCell"; title = "Check now"; ObjectID = "8Rb-OS-d59"; */
+"8Rb-OS-d59.title" = "Controlla ora";
+
+/* Class = "NSButtonCell"; title = "Fuzzy search"; ObjectID = "CGs-Td-v66"; */
+"CGs-Td-v66.title" = "Ricerca approssimata";
+
+/* Class = "NSButtonCell"; title = "Launch at login"; ObjectID = "Cfl-qm-UkM"; */
+"Cfl-qm-UkM.title" = "Apri al login";
+
+/* Class = "NSTextFieldCell"; title = "Behavior:"; ObjectID = "HJa-3L-ffW"; */
+"HJa-3L-ffW.title" = "Comportamento:";
+
+/* Class = "NSTextFieldCell"; title = "\nHotkey:"; ObjectID = "QZW-5n-gLa"; */
+"QZW-5n-gLa.title" = "\nCombinazione di tasti:";
+
+/* Class = "NSTextFieldCell"; title = "Customize the behavior when selecting item:"; ObjectID = "ZSa-vg-zWi"; */
+"ZSa-vg-zWi.title" = "Personalizza il comportamento quando si seleziona un elemento:";
+
+/* Class = "NSButtonCell"; title = "Check for updates automatically"; ObjectID = "avb-QJ-T0h"; */
+"avb-QJ-T0h.title" = "Controlla automaticamente la presenza di aggiornamenti";
+
+/* Class = "NSButtonCell"; title = "Paste automatically"; ObjectID = "kK4-kG-DIY"; */
+"kK4-kG-DIY.title" = "Incolla automaticamente";
+
+/* Class = "NSButtonCell"; title = "Paste without formatting"; ObjectID = "5NO-0n-i7l"; */
+"5NO-0n-i7l.title" = "Incolla senza formattazione";
+
+/* Class = "NSTextFieldCell"; title = "Global shortcut key to open application.\nDefault: ⇧⌘C."; ObjectID = "rCZ-AO-G8B"; */
+"rCZ-AO-G8B.title" = "Combinazione di tasti globale per aprire l'applicazione.\nDefault: ⇧⌘C.";
+
+/* Class = "NSTextFieldCell"; title = "Enable non-exact search. Please note that fuzzy search might be slow when history size is bigger than 200."; ObjectID = "tUJ-hx-P24"; */
+"tUJ-hx-P24.title" = "Abilita la ricerca non esatta. Per favore, prendi nota del fatto che la ricerca non esatta potrebbe essere lenta quando la dimensione della cronologia è superiore a 200.";
+
+/* Class = "NSButtonCell"; title = "Sounds"; ObjectID = "lkL-5p-KVx"; */
+"lkL-5p-KVx.title" = "Suoni";
+
+/* Class = "NSTextFieldCell"; title = "Play sound effects when a new item is added to the history and the previous item is selected."; ObjectID = "fda-wq-rZq"; */
+"fda-wq-rZq.title" = "Riproduci un effetto sonoro quando un nuovo elemento è aggiunto alla cronologia e l'elemento precedente è selezionato.";

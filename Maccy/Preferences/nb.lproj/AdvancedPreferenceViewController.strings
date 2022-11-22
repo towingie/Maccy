@@ -1,18 +1,12 @@
 
-/* Class = "NSTextFieldCell"; title = "Text Cell"; ObjectID = "4iz-e8-h5u"; */
-"4iz-e8-h5u.title" = "Tekstcelle";
-
-/* Class = "NSTableColumn"; headerCell.title = "Ignored pasteboard types"; ObjectID = "6cc-Og-e8p"; */
-"6cc-Og-e8p.headerCell.title" = "Ignorerte utklippstavle-typer";
-
 /* Class = "NSTextFieldCell"; title = "Temporarily ignore all new copies.\nYou are likely to use it programmatically and disable application while copying sensitive data."; ObjectID = "Ejh-zi-AFs"; */
 "Ejh-zi-AFs.title" = "Midlertidig ignorer alle nye kopier.\nDu vil mest sannsynlig bruke det programmatisk og deaktivere programmet ved kopiering av sensitive data.";
 
 /* Class = "NSTextFieldCell"; title = "defaults write org.p0deje.Maccy ignoreEvents true\n# copy data\ndefaults write org.p0deje.Maccy ignoreEvents false"; ObjectID = "LFh-6b-GFi"; */
 "LFh-6b-GFi.title" = "defaults write org.p0deje.Maccy ignoreEvents true\n# kopier data\ndefaults write org.p0deje.Maccy ignoreEvents false";
 
-/* Class = "NSTextFieldCell"; title = "It's possible to ignore certain pasteboard item types from remembering.\nBy default, some known application-specific types are defined. You can remove them and add any custom types you want."; ObjectID = "Meq-nm-ddS"; */
-"Meq-nm-ddS.title" = "Det er mulig å ignorere visse typer utklippstavle elementer fra å bli husket.\nPSom standard er noen kjente program-spesifikke typer definert. Hvis du øsnker, kan du fjerne dem og legge til egne tilpassede typer.";
+/* Class = "NSTextFieldCell"; title = "You can also click the menu icon with ⌥ pressed. To ignore only the next copy, click with ⌥⇧."; ObjectID = "lwS-2p-WwS"; */
+"lwS-2p-WwS.title" = "Du kan også klikke på menyikonet med ⌥ trykket. For å ignorere bare den neste kopien, klikk med ⌥⇧.";
 
 /* Class = "NSButtonCell"; title = "Turn off"; ObjectID = "RA0-eh-Udt"; */
 "RA0-eh-Udt.title" = "Deaktiver";
@@ -22,3 +16,15 @@
 
 /* Class = "NSButtonCell"; title = "Avoid taking application focus"; ObjectID = "jjU-HE-iIA"; */
 "jjU-HE-iIA.title" = "Unngå applikasjonsfokus";
+
+/* Class = "NSButtonCell"; title = "Clear history on quit"; ObjectID = "JvB-ng-8vt"; */
+"JvB-ng-8vt.title" = "Tøm historikk når du slutter";
+
+/* Class = "NSTextFieldCell"; title = "Automatically remove all unpinned items before quitting the application."; ObjectID = "LW1-8W-pFI"; */
+"LW1-8W-pFI.title" = "Fjern alle ikke-festede elementer automatisk før du avslutter applikasjonen.";
+
+/* Class = "NSButtonCell"; title = "Clear the system clipboard too"; ObjectID = "WSh-1o-SG8"; */
+"WSh-1o-SG8.title" = "Tøm systemets utklippstavle også";
+
+/* Class = "NSTextFieldCell"; title = "When enabled, clearing the history would also clear the current system clipboard."; ObjectID = "SJh-zS-Osw" */
+"SJh-zS-Osw.title" = "Når den er aktivert, vil tømming av loggen også tømme gjeldende systemutklippstavle.";

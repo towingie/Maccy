@@ -3,12 +3,16 @@ import Cocoa
 extension UserDefaults {
   public struct Keys {
     static let avoidTakingFocus = "avoidTakingFocus"
+    static let clearOnQuit = "clearOnQuit"
+    static let clearSystemClipboard = "clearSystemClipboard"
     static let enabledPasteboardTypes = "enabledPasteboardTypes"
     static let fuzzySearch = "fuzzySearch"
     static let hideFooter = "hideFooter"
     static let hideSearch = "hideSearch"
     static let hideTitle = "hideTitle"
     static let ignoreEvents = "ignoreEvents"
+    static let ignoreOnlyNextEvent = "ignoreOnlyNextEvent"
+    static let ignoredApps = "ignoredApps"
     static let ignoredPasteboardTypes = "ignoredPasteboardTypes"
     static let imageMaxHeight = "imageMaxHeight"
     static let maxMenuItems = "maxMenuItems"
@@ -22,7 +26,7 @@ extension UserDefaults {
     static let showRecentCopyInMenuBar = "showRecentCopyInMenuBar"
     static let size = "historySize"
     static let sortBy = "sortBy"
-    static let supressClearAlert = "supressClearAlert"
+    static let suppressClearAlert = "suppressClearAlert"
 
     static var showInStatusBar: String {
       ProcessInfo.processInfo.arguments.contains("ui-testing") ? "showInStatusBarUITests" : "showInStatusBar"
@@ -34,6 +38,7 @@ extension UserDefaults {
   }
 
   public struct Values {
+    static let ignoredApps: [String] = []
     static let ignoredPasteboardTypes: [String] = []
     static let imageMaxHeight = 40.0
     static let maxMenuItems = 0
@@ -43,12 +48,21 @@ extension UserDefaults {
     static let showInStatusBar = true
     static let size = 200
     static let sortBy = "lastCopiedAt"
-    static let storage: [HistoryItemOld] = []
   }
 
   public var avoidTakingFocus: Bool {
     get { bool(forKey: Keys.avoidTakingFocus) }
     set { set(newValue, forKey: Keys.avoidTakingFocus) }
+  }
+
+  public var clearOnQuit: Bool {
+    get { bool(forKey: Keys.clearOnQuit) }
+    set { set(newValue, forKey: Keys.clearOnQuit) }
+  }
+
+  public var clearSystemClipboard: Bool {
+    get { bool(forKey: Keys.clearSystemClipboard) }
+    set { set(newValue, forKey: Keys.clearSystemClipboard) }
   }
 
   @objc dynamic public var enabledPasteboardTypes: Set<NSPasteboard.PasteboardType> {
@@ -82,6 +96,16 @@ extension UserDefaults {
   @objc dynamic public var ignoreEvents: Bool {
     get { bool(forKey: Keys.ignoreEvents) }
     set { set(newValue, forKey: Keys.ignoreEvents) }
+  }
+
+  public var ignoreOnlyNextEvent: Bool {
+    get { bool(forKey: Keys.ignoreOnlyNextEvent) }
+    set { set(newValue, forKey: Keys.ignoreOnlyNextEvent) }
+  }
+
+  public var ignoredApps: [String] {
+    get { array(forKey: Keys.ignoredApps) as? [String] ?? Values.ignoredApps }
+    set { set(newValue, forKey: Keys.ignoredApps) }
   }
 
   public var ignoredPasteboardTypes: Set<String> {
@@ -154,22 +178,8 @@ extension UserDefaults {
     set { set(newValue, forKey: Keys.sortBy) }
   }
 
-  // swiftlint:disable force_try
-  public var storage: [HistoryItemOld] {
-    get {
-      if let storedArray = UserDefaults.standard.object(forKey: Keys.storage) as? Data {
-        return try! PropertyListDecoder().decode([HistoryItemOld].self, from: storedArray)
-      } else {
-        return Values.storage
-      }
-    }
-
-    set { set(try! PropertyListEncoder().encode(newValue), forKey: Keys.storage) }
-  }
-  // swiftlint:enable force_try
-
-  public var supressClearAlert: Bool {
-    get { bool(forKey: Keys.supressClearAlert) }
-    set { set(newValue, forKey: Keys.supressClearAlert) }
+  public var suppressClearAlert: Bool {
+    get { bool(forKey: Keys.suppressClearAlert) }
+    set { set(newValue, forKey: Keys.suppressClearAlert) }
   }
 }

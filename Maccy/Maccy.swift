@@ -1,6 +1,5 @@
 import Cocoa
 import KeyboardShortcuts
-import LoginServiceKit
 import Preferences
 
 // swiftlint:disable type_body_length
@@ -11,11 +10,11 @@ class Maccy: NSObject {
   private let statusItemTitleMaxLength = 20
 
   private let about = About()
-  private let clipboard = Clipboard()
+  private let clipboard = Clipboard.shared
   private let history = History()
   private var menu: Menu!
+  private var menuLoader: MenuLoader!
   private var window: NSWindow!
-  @objc private var menuLink: NSStatusItem!
 
   private let carbonMenuWindowClass = "NSStatusBarWindow"
   private var clearAlert: NSAlert {
@@ -34,14 +33,13 @@ class Maccy: NSObject {
   private lazy var preferencesWindowController = PreferencesWindowController(
     preferencePanes: [
       GeneralPreferenceViewController(),
+      StoragePreferenceViewController(),
       AppearancePreferenceViewController(),
+      PinsPreferenceViewController(),
+      IgnorePreferenceViewController(),
       AdvancedPreferenceViewController()
     ]
   )
-
-  private var filterMenuRect: NSRect {
-    return NSRect(x: 0, y: 0, width: menu.menuWidth, height: UserDefaults.standard.hideSearch ? 1 : 29)
-  }
 
   private var enabledPasteboardTypesObserver: NSKeyValueObservation?
   private var ignoreEventsObserver: NSKeyValueObservation?
@@ -60,60 +58,10 @@ class Maccy: NSObject {
   override init() {
     UserDefaults.standard.register(defaults: [UserDefaults.Keys.showInStatusBar: UserDefaults.Values.showInStatusBar])
     super.init()
+    initializeObservers()
 
-    enabledPasteboardTypesObserver = UserDefaults.standard.observe(\.enabledPasteboardTypes,
-                                                           options: .new,
-                                                           changeHandler: { _, _ in
-      self.updateStatusItemEnabledness()
-    })
-    ignoreEventsObserver = UserDefaults.standard.observe(\.ignoreEvents, options: .new, changeHandler: { _, _ in
-      self.updateStatusItemEnabledness()
-    })
-    imageHeightObserver = UserDefaults.standard.observe(\.imageMaxHeight, options: .new, changeHandler: { _, _ in
-      self.menu.resizeImageMenuItems()
-    })
-    hideFooterObserver = UserDefaults.standard.observe(\.hideFooter, options: .new, changeHandler: { _, _ in
-      self.rebuild()
-    })
-    hideSearchObserver = UserDefaults.standard.observe(\.hideSearch, options: .new, changeHandler: { _, _ in
-      self.rebuild()
-    })
-    hideTitleObserver = UserDefaults.standard.observe(\.hideTitle, options: .new, changeHandler: { _, _ in
-      self.rebuild()
-    })
-    pasteByDefaultObserver = UserDefaults.standard.observe(\.pasteByDefault, options: .new, changeHandler: { _, _ in
-      self.rebuild()
-    })
-    pinToObserver = UserDefaults.standard.observe(\.pinTo, options: .new, changeHandler: { _, _ in
-      self.rebuild()
-    })
-    removeFormattingByDefaultObserver = UserDefaults.standard.observe(\.removeFormattingByDefault,
-                                                                      options: .new,
-                                                                      changeHandler: { _, _ in
-      self.rebuild()
-    })
-    sortByObserver = UserDefaults.standard.observe(\.sortBy, options: .new, changeHandler: { _, _ in
-      self.rebuild()
-    })
-    showRecentCopyInMenuBarObserver = UserDefaults.standard.observe(\.showRecentCopyInMenuBar,
-                                                                    options: .new,
-                                                                    changeHandler: { _, _ in
-      self.updateMenuTitle()
-    })
-    statusItemConfigurationObserver = UserDefaults.standard.observe(\.showInStatusBar,
-                                                                    options: .new,
-                                                                    changeHandler: { _, change in
-      if self.statusItem.isVisible != change.newValue! {
-        self.statusItem.isVisible = change.newValue!
-      }
-    })
-    statusItemVisibilityObserver = observe(\.statusItem.isVisible, options: .new, changeHandler: { _, change in
-      if UserDefaults.standard.showInStatusBar != change.newValue! {
-        UserDefaults.standard.showInStatusBar = change.newValue!
-      }
-    })
-
-    menu = Menu(history: history, clipboard: clipboard)
+    menu = Menu(history: history, clipboard: Clipboard.shared)
+    menuLoader = MenuLoader(performStatusItemClick)
     start()
   }
 
@@ -133,30 +81,59 @@ class Maccy: NSObject {
   }
 
   func popUp() {
+    // Grab focused window frame before changing focus
+    let windowFrame = NSWorkspace.shared.frontmostApplication?.windowFrame
+
     withFocus {
       switch UserDefaults.standard.popupPosition {
       case "center":
-        if let screen = NSScreen.main {
-          let topLeftX = (screen.frame.width - self.menu.size.width) / 2 + screen.frame.origin.x
-          var topLeftY = (screen.frame.height + self.menu.size.height) / 2 - screen.frame.origin.y
-          if screen.frame.height < self.menu.size.height {
-            topLeftY = screen.frame.origin.y
+        if let frame = NSScreen.main?.visibleFrame {
+          self.linkingMenuToStatusItem {
+            self.menu.popUp(positioning: nil, at: NSRect.centered(ofSize: self.menu.size, in: frame).origin, in: nil)
           }
-          self.menu.popUp(positioning: nil, at: NSPoint(x: topLeftX + 1.0, y: topLeftY + 1.0), in: nil)
         }
       case "statusItem":
         self.simulateStatusItemClick()
+      case "window":
+        if let frame = windowFrame {
+          self.linkingMenuToStatusItem {
+            self.menu.popUp(positioning: nil, at: NSRect.centered(ofSize: self.menu.size, in: frame).origin, in: nil)
+          }
+        } else {
+          fallthrough
+        }
       default:
-        self.menu.popUp(positioning: nil, at: NSEvent.mouseLocation, in: nil)
+        self.linkingMenuToStatusItem {
+          self.menu.popUp(positioning: nil, at: NSEvent.mouseLocation, in: nil)
+        }
       }
     }
   }
 
+  func select(position: Int) -> String? {
+    return menu.select(position: position)
+  }
+
+  func clearUnpinned(suppressClearAlert: Bool = false) {
+    withClearAlert(suppressClearAlert: suppressClearAlert) {
+      self.history.clearUnpinned()
+      self.menu.clearUnpinned()
+      self.clipboard.clear()
+    }
+  }
+
   @objc
-  func performStatusItemClick() {
-    if let event = NSApp.currentEvent {
-      if event.modifierFlags.intersection(.deviceIndependentFlagsMask) == .option {
+  private func performStatusItemClick(_ event: NSEvent?) {
+    if let event = event {
+      let modifierFlags = event.modifierFlags.intersection(.deviceIndependentFlagsMask)
+
+      if modifierFlags.contains(.option) {
         UserDefaults.standard.ignoreEvents = !UserDefaults.standard.ignoreEvents
+
+        if modifierFlags.contains(.shift) {
+          UserDefaults.standard.ignoreOnlyNextEvent = UserDefaults.standard.ignoreEvents
+        }
+
         return
       }
     }
@@ -169,13 +146,11 @@ class Maccy: NSObject {
   private func start() {
     statusItem.behavior = .removalAllowed
     statusItem.isVisible = UserDefaults.standard.showInStatusBar
+    statusItem.menu = menuLoader
 
     if let button = statusItem.button {
       button.image = NSImage(named: "StatusBarMenuImage")
       button.imagePosition = .imageRight
-      // Simulate statusItem.menu but allowing to use withFocus
-      button.action = #selector(performStatusItemClick)
-      button.target = self
       (button.cell as? NSButtonCell)?.highlightsBy = []
     }
 
@@ -189,26 +164,12 @@ class Maccy: NSObject {
     populateFooter()
 
     updateStatusItemEnabledness()
-
-    // Link menu to that UI tests can discover it.
-    // Normally we would use statusItem.menu, but we cannot because
-    // there is no way to activate the application when it is clicked.
-    // Hence, we create additional hidden NSStatusItem for tests only.
-    if ProcessInfo.processInfo.arguments.contains("ui-testing") {
-      menuLink = NSStatusBar.system.statusItem(withLength: NSStatusItem.squareLength)
-      menuLink.isVisible = false
-      menuLink.menu = menu
-    }
   }
 
   private func populateHeader() {
-    let headerItemView = FilterMenuItemView(frame: filterMenuRect)
-    headerItemView.title = "Maccy"
-
     let headerItem = NSMenuItem()
     headerItem.title = "Maccy"
-    headerItem.view = headerItemView
-    headerItem.isEnabled = false
+    headerItem.view = MenuHeader().view
 
     menu.addItem(headerItem)
   }
@@ -227,49 +188,45 @@ class Maccy: NSObject {
   }
 
   @objc
-  func menuItemAction(_ sender: NSMenuItem) {
+  private func menuItemAction(_ sender: NSMenuItem) {
     if let tag = MenuFooter(rawValue: sender.tag) {
       switch tag {
       case .about:
         Maccy.returnFocusToPreviousApp = false
         about.openAbout(sender)
+        Maccy.returnFocusToPreviousApp = true
       case .clear:
         clearUnpinned()
       case .clearAll:
         clearAll()
       case .quit:
-        NSApp.stop(sender)
+        NSApp.terminate(sender)
       case .preferences:
         Maccy.returnFocusToPreviousApp = false
         preferencesWindowController.show()
+        Maccy.returnFocusToPreviousApp = true
       default:
         break
       }
     }
   }
 
-  private func clearUnpinned() {
-    withClearAlert {
-      self.history.all.filter({ $0.pin == nil }).forEach(self.history.remove(_:))
-      self.menu.clearUnpinned()
-    }
-  }
-
-  private func clearAll() {
-    withClearAlert {
+  private func clearAll(suppressClearAlert: Bool = false) {
+    withClearAlert(suppressClearAlert: suppressClearAlert) {
       self.history.clear()
       self.menu.clearAll()
+      self.clipboard.clear()
     }
   }
 
-  private func withClearAlert(_ closure: @escaping () -> Void) {
-    if UserDefaults.standard.supressClearAlert {
+  private func withClearAlert(suppressClearAlert: Bool, _ closure: @escaping () -> Void) {
+    if suppressClearAlert || UserDefaults.standard.suppressClearAlert {
       closure()
     } else {
       let alert = clearAlert
       if alert.runModal() == NSApplication.ModalResponse.alertFirstButtonReturn {
         if alert.suppressionButton?.state == .on {
-          UserDefaults.standard.supressClearAlert = true
+          UserDefaults.standard.suppressClearAlert = true
         }
         closure()
       }
@@ -304,9 +261,9 @@ class Maccy: NSObject {
   private func simulateStatusItemClick() {
     if let buttonCell = statusItem.button?.cell as? NSButtonCell {
       withMenuButtonHighlighted(buttonCell) {
-        self.statusItem.menu = self.menu
-        self.statusItem.button?.performClick(self)
-        self.statusItem.menu = nil
+        self.linkingMenuToStatusItem {
+          self.statusItem.button?.performClick(self)
+        }
       }
     }
   }
@@ -320,6 +277,12 @@ class Maccy: NSObject {
       closure()
       buttonCell.highlightsBy = []
     }
+  }
+
+  private func linkingMenuToStatusItem(_ closure: @escaping () -> Void) {
+    statusItem.menu = menu
+    closure()
+    statusItem.menu = menuLoader
   }
 
   // Executes closure with application focus (pun intended).
@@ -356,7 +319,6 @@ class Maccy: NSObject {
   // and fallback to default NSMenu behavior by enabling
   // UserDefaults.standard.avoidTakingFocus.
   private func withFocus(_ closure: @escaping () -> Void) {
-    Maccy.returnFocusToPreviousApp = extraVisibleWindows.count == 0
     KeyboardShortcuts.disable(.popup)
 
     if UserDefaults.standard.avoidTakingFocus {
@@ -367,8 +329,9 @@ class Maccy: NSObject {
       Timer.scheduledTimer(withTimeInterval: 0.04, repeats: false) { _ in
         closure()
         KeyboardShortcuts.enable(.popup)
-        if Maccy.returnFocusToPreviousApp {
+        if Maccy.returnFocusToPreviousApp && self.extraVisibleWindows.count == 0 {
           NSApp.hide(self)
+          Maccy.returnFocusToPreviousApp = true
         }
       }
     }
@@ -377,6 +340,55 @@ class Maccy: NSObject {
   private func updateStatusItemEnabledness() {
     statusItem.button?.appearsDisabled = UserDefaults.standard.ignoreEvents ||
       UserDefaults.standard.enabledPasteboardTypes.isEmpty
+  }
+
+  private func initializeObservers() {
+    enabledPasteboardTypesObserver = UserDefaults.standard.observe(\.enabledPasteboardTypes, options: .new) { _, _ in
+      self.updateStatusItemEnabledness()
+    }
+    ignoreEventsObserver = UserDefaults.standard.observe(\.ignoreEvents, options: .new) { _, _ in
+      self.updateStatusItemEnabledness()
+    }
+    imageHeightObserver = UserDefaults.standard.observe(\.imageMaxHeight, options: .new) { _, _ in
+      self.menu.resizeImageMenuItems()
+    }
+    hideFooterObserver = UserDefaults.standard.observe(\.hideFooter, options: .new) { _, _ in
+      self.rebuild()
+    }
+    hideSearchObserver = UserDefaults.standard.observe(\.hideSearch, options: .new) { _, _ in
+      self.rebuild()
+    }
+    hideTitleObserver = UserDefaults.standard.observe(\.hideTitle, options: .new) { _, _ in
+      self.rebuild()
+    }
+    pasteByDefaultObserver = UserDefaults.standard.observe(\.pasteByDefault, options: .new) { _, _ in
+      self.rebuild()
+    }
+    pinToObserver = UserDefaults.standard.observe(\.pinTo, options: .new) { _, _ in
+      self.rebuild()
+    }
+    removeFormattingByDefaultObserver = UserDefaults.standard.observe(\.removeFormattingByDefault,
+                                                                      options: .new) { _, _ in
+      self.rebuild()
+    }
+    sortByObserver = UserDefaults.standard.observe(\.sortBy, options: .new) { _, _ in
+      self.rebuild()
+    }
+    showRecentCopyInMenuBarObserver = UserDefaults.standard.observe(\.showRecentCopyInMenuBar,
+                                                                    options: .new) { _, _ in
+      self.updateMenuTitle()
+    }
+    statusItemConfigurationObserver = UserDefaults.standard.observe(\.showInStatusBar,
+                                                                    options: .new) { _, change in
+      if self.statusItem.isVisible != change.newValue! {
+        self.statusItem.isVisible = change.newValue!
+      }
+    }
+    statusItemVisibilityObserver = observe(\.statusItem.isVisible, options: .new) { _, change in
+      if UserDefaults.standard.showInStatusBar != change.newValue! {
+        UserDefaults.standard.showInStatusBar = change.newValue!
+      }
+    }
   }
 }
 // swiftlint:enable type_body_length

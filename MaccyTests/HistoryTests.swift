@@ -3,6 +3,7 @@ import XCTest
 
 class HistoryTests: XCTestCase {
   let savedSize = UserDefaults.standard.size
+  let savedSortBy = UserDefaults.standard.sortBy
   let history = History()
 
   override func setUp() {
@@ -10,12 +11,14 @@ class HistoryTests: XCTestCase {
     CoreDataManager.inMemory = true
     history.clear()
     UserDefaults.standard.size = 10
+    UserDefaults.standard.sortBy = "firstCopiedAt"
   }
 
   override func tearDown() {
     super.tearDown()
     CoreDataManager.inMemory = false
     UserDefaults.standard.size = savedSize
+    UserDefaults.standard.sortBy = savedSortBy
   }
 
   func testDefaultIsEmpty() {
@@ -33,16 +36,21 @@ class HistoryTests: XCTestCase {
   func testAddingSame() {
     let first = historyItem("foo")
     first.pin = "f"
+    first.title = "xyz"
+    first.application = "iTerm.app"
     history.add(first)
     let second = historyItem("bar")
     history.add(second)
     let third = historyItem("foo")
+    third.application = "Xcode.app"
     history.add(third)
 
-    XCTAssertEqual(history.all, [second, third])
-    XCTAssertTrue(history.all[1].lastCopiedAt > history.all[0].firstCopiedAt)
-    XCTAssertEqual(history.all[1].numberOfCopies, 2)
-    XCTAssertEqual(history.all[1].pin, "f")
+    XCTAssertEqual(history.all, [third, second])
+    XCTAssertTrue(history.all[0].lastCopiedAt > history.all[0].firstCopiedAt)
+    XCTAssertEqual(history.all[0].numberOfCopies, 2)
+    XCTAssertEqual(history.all[0].pin, "f")
+    XCTAssertEqual(history.all[0].title, "xyz")
+    XCTAssertEqual(history.all[0].application, "iTerm.app")
   }
 
   func testAddingItemThatIsSupersededByExisting() {
@@ -70,6 +78,15 @@ class HistoryTests: XCTestCase {
     XCTAssertEqual(history.all[0].numberOfCopies, 0)
     CoreDataManager.shared.viewContext.refresh(historyItem, mergeChanges: false)
     XCTAssertEqual(history.all[0].numberOfCopies, 0)
+  }
+
+  func testClearingUnpinned() {
+    let pinned = historyItem("foo")
+    pinned.pin = "f"
+    history.add(pinned)
+    history.add(historyItem("bar"))
+    history.clearUnpinned()
+    XCTAssertEqual(history.all, [pinned])
   }
 
   func testClearing() {

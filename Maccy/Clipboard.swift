@@ -2,6 +2,8 @@ import AppKit
 import Sauce
 
 class Clipboard {
+  static let shared = Clipboard()
+
   typealias OnNewCopyHook = (HistoryItem) -> Void
 
   public var onNewCopyHooks: [OnNewCopyHook] = []
@@ -18,14 +20,20 @@ class Clipboard {
 
   private var changeCount: Int
 
+  private let dynamicTypePrefix = "dyn."
+  private let microsoftSourcePrefix = "com.microsoft.ole.source."
   private let supportedTypes: Set = [
     NSPasteboard.PasteboardType.fileURL,
+    NSPasteboard.PasteboardType.html,
     NSPasteboard.PasteboardType.png,
+    NSPasteboard.PasteboardType.rtf,
     NSPasteboard.PasteboardType.string,
     NSPasteboard.PasteboardType.tiff
   ]
   private var enabledTypes: Set<NSPasteboard.PasteboardType> { UserDefaults.standard.enabledPasteboardTypes }
   private var disabledTypes: Set<NSPasteboard.PasteboardType> { supportedTypes.subtracting(enabledTypes) }
+
+  private var sourceApp: NSRunningApplication? { NSWorkspace.shared.frontmostApplication }
 
   private var accessibilityAlert: NSAlert {
     let alert = NSAlert()
@@ -56,6 +64,12 @@ class Clipboard {
                          selector: #selector(checkForChangesInPasteboard),
                          userInfo: nil,
                          repeats: true)
+  }
+
+  func copy(_ string: String) {
+    pasteboard.clearContents()
+    pasteboard.setString(string, forType: .string)
+    checkForChangesInPasteboard()
   }
 
   func copy(_ item: HistoryItem, removeFormatting: Bool = false) {
@@ -93,7 +107,10 @@ class Clipboard {
     }
 
     DispatchQueue.main.async {
-      let vCode = Sauce.shared.keyCode(by: .v)
+      // Add flag that left/right modifier key has been pressed.
+      // See https://github.com/TermiT/Flycut/pull/18 for details.
+      let cmdFlag = CGEventFlags(rawValue: UInt64(KeyChord.pasteKeyModifiers.rawValue) | 0x000008)
+      let vCode = Sauce.shared.keyCode(for: KeyChord.pasteKey)
       let source = CGEventSource(stateID: .combinedSessionState)
       // Disable local keyboard events while pasting
       source?.setLocalEventsFilterDuringSuppressionState([.permitLocalMouseEvents, .permitSystemDefinedEvents],
@@ -101,11 +118,19 @@ class Clipboard {
 
       let keyVDown = CGEvent(keyboardEventSource: source, virtualKey: vCode, keyDown: true)
       let keyVUp = CGEvent(keyboardEventSource: source, virtualKey: vCode, keyDown: false)
-      keyVDown?.flags = .maskCommand
-      keyVUp?.flags = .maskCommand
+      keyVDown?.flags = cmdFlag
+      keyVUp?.flags = cmdFlag
       keyVDown?.post(tap: .cgAnnotatedSessionEventTap)
       keyVUp?.post(tap: .cgAnnotatedSessionEventTap)
     }
+  }
+
+  func clear() {
+    guard UserDefaults.standard.clearSystemClipboard else {
+      return
+    }
+
+    pasteboard.clearContents()
   }
 
   @objc
@@ -116,36 +141,51 @@ class Clipboard {
 
     if UserDefaults.standard.ignoreEvents {
       changeCount = pasteboard.changeCount
+
+      if UserDefaults.standard.ignoreOnlyNextEvent {
+        UserDefaults.standard.ignoreEvents = false
+        UserDefaults.standard.ignoreOnlyNextEvent = false
+      }
+
       return
     }
 
-    // Some applications add 2 items to pasteboard when copying:
-    //   1. The proper meaningful string.
-    //   2. The empty item with no data and types.
-    // An example of such application is BBEdit.
-    // To handle such cases, handle all new pasteboard items,
-    // not only the last one.
-    // See https://github.com/p0deje/Maccy/issues/78.
+    // Reading types on NSPasteboard gives all the available
+    // types - even the ones that are not present on the NSPasteboardItem.
+    // See https://github.com/p0deje/Maccy/issues/241.
+    if shouldIgnore(Set(pasteboard.types ?? [])) {
+      return
+    }
+
+    if let sourceAppBundle = sourceApp?.bundleIdentifier {
+      if UserDefaults.standard.ignoredApps.contains(sourceAppBundle) {
+        return
+      }
+    }
+
+    // Some applications (BBEdit, Edge) add 2 items to pasteboard when copying
+    // so it's better to merge all data into a single record.
+    // - https://github.com/p0deje/Maccy/issues/78
+    // - https://github.com/p0deje/Maccy/issues/472
+    var contents: [HistoryItemContent] = []
     pasteboard.pasteboardItems?.forEach({ item in
-      // Reading types on NSPasteboard gives all the available
-      // types - even the ones that are not present on the NSPasteboardItem.
-      // See https://github.com/p0deje/Maccy/issues/241.
-      if shouldIgnore(Set(pasteboard.types ?? [])) {
-        return
-      }
-
       let types = Set(item.types)
-      if types.contains(.string) && isEmptyString(item) {
+      if types.contains(.string) && isEmptyString(item) && !richText(item) {
         return
       }
 
-      let contents = types.subtracting(disabledTypes).map({ type in
-        return HistoryItemContent(type: type.rawValue, value: item.data(forType: type))
-      })
-      let historyItem = HistoryItem(contents: contents)
-
-      onNewCopyHooks.forEach({ $0(historyItem) })
+      contents += types
+        .subtracting(disabledTypes)
+        .filter { !$0.rawValue.starts(with: dynamicTypePrefix) && !$0.rawValue.starts(with: microsoftSourcePrefix) }
+        .map { HistoryItemContent(type: $0.rawValue, value: item.data(forType: $0)) }
     })
+
+    guard !contents.isEmpty else {
+      return
+    }
+
+    let historyItem = HistoryItem(contents: contents, application: sourceApp?.bundleIdentifier)
+    onNewCopyHooks.forEach({ $0(historyItem) })
 
     changeCount = pasteboard.changeCount
   }
@@ -166,11 +206,28 @@ class Clipboard {
     return string.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
   }
 
+  private func richText(_ item: NSPasteboardItem) -> Bool {
+    if let rtf = item.data(forType: .rtf) {
+      if let attributedString = NSAttributedString(rtf: rtf, documentAttributes: nil) {
+        return !attributedString.string.isEmpty
+      }
+    }
+
+    if let html = item.data(forType: .html) {
+      if let attributedString = NSAttributedString(html: html, documentAttributes: nil) {
+        return !attributedString.string.isEmpty
+      }
+    }
+
+    return false
+  }
+
   private func showAccessibilityWindow() {
     if accessibilityAlert.runModal() == NSApplication.ModalResponse.alertSecondButtonReturn {
       if let url = accessibilityURL {
         NSWorkspace.shared.open(url)
       }
     }
+    Maccy.returnFocusToPreviousApp = true
   }
 }
